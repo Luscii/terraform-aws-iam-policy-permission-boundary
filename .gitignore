@@ -43,3 +43,5 @@ node_modules/
 # ignore local terraform variables file
 local.tfvars
 local.auto.tfvars
+
+.terraform.lock.hcl

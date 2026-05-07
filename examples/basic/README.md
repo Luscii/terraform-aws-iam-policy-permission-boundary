@@ -1,10 +1,12 @@
 # Basic Example
 
-Minimal configuration showing the essential inputs required to use this module.
+Minimal Permission Boundary with one allow and one caller-supplied deny. The module's built-in denies (boundary tampering, human user surface, org governance) are present by default — no toggles overridden.
 
-## Purpose
+## What this example demonstrates
 
-Demonstrates the simplest possible setup to get started with this module.
+- Smallest possible boundary: one Allow (`s3:GetObject`, `s3:ListBucket`), one caller Deny (`ec2:RunInstances`).
+- All built-in denies on (defaults).
+- CloudPosse label integration.
 
 ## Usage
 
