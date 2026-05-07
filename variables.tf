@@ -130,5 +130,10 @@ variable "permit_policy_mutation" {
     activating older policy versions). Only set to `true` for
     boundaries on roles that legitimately manage other roles' trust
     policies or policy versions (rare).
+
+    Note: setting this to `true` only relaxes the deny on *non-boundary*
+    policies. Mutation of policies at the `/boundaries/` path remains
+    denied unconditionally via a separate, always-on statement,
+    regardless of this toggle.
   EOT
 }

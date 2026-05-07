@@ -61,7 +61,7 @@ module "label" {
 }
 
 module "boundary" {
-  source = "github.com/Luscii/terraform-aws-iam-policy-permission-boundary?ref=v0.1.0"
+  source = "github.com/Luscii/terraform-aws-iam-policy-permission-boundary?ref=<VERSION>"
 
   name    = module.label.name
   context = module.label.context
@@ -80,7 +80,7 @@ For boundaries that should narrow the role to specific services regardless of id
 
 ```hcl
 module "boundary" {
-  source = "github.com/Luscii/terraform-aws-iam-policy-permission-boundary?ref=v0.1.0"
+  source = "github.com/Luscii/terraform-aws-iam-policy-permission-boundary?ref=<VERSION>"
 
   name    = module.label.name
   context = module.label.context
@@ -99,7 +99,7 @@ The boundary is then bound onto a role via `permissions_boundary = module.bounda
 ## Examples
 
 - [`examples/basic`](./examples/basic) — minimal allow/deny lists with default built-in denies.
-- [`examples/complete`](./examples/complete) — workload-shaped boundary with realistic action lists, tags, and one of the opt-out toggles demonstrated.
+- [`examples/complete`](./examples/complete) — workload-shaped boundary in the deny-list shape (`allow_all = true`) with realistic caller-supplied denies and tags. Built-in deny groups left at their defaults — no opt-out toggles set.
 
 ## Tests
 
@@ -158,7 +158,7 @@ pre-commit run --all-files
 | <a name="input_name"></a> [name](#input\_name) | Name of the resource to be labeled. This is used to generate the label key and value. | `string` | n/a | yes |
 | <a name="input_permit_human_user_actions"></a> [permit\_human\_user\_actions](#input\_permit\_human\_user\_actions) | Permit the human-user-surface actions (`iam:CreateUser`,<br/>`iam:CreateLoginProfile`, `iam:UpdateLoginProfile`,<br/>`iam:CreateAccessKey`, `iam:UpdateAccessKey`) that this module<br/>denies by default. Only set to `true` for boundaries on roles<br/>that legitimately manage human users (rare). | `bool` | `false` | no |
 | <a name="input_permit_org_governance"></a> [permit\_org\_governance](#input\_permit\_org\_governance) | Permit `organizations:*` and `account:*` that this module denies<br/>by default. Only set to `true` for boundaries on org-management<br/>roles (rare). | `bool` | `false` | no |
-| <a name="input_permit_policy_mutation"></a> [permit\_policy\_mutation](#input\_permit\_policy\_mutation) | Permit `iam:UpdateAssumeRolePolicy`, `iam:CreatePolicyVersion`,<br/>and `iam:SetDefaultPolicyVersion` that this module denies by<br/>default. These actions can be used to bypass the boundary<br/>(rewriting trust policies, mutating attached policies in place,<br/>activating older policy versions). Only set to `true` for<br/>boundaries on roles that legitimately manage other roles' trust<br/>policies or policy versions (rare). | `bool` | `false` | no |
+| <a name="input_permit_policy_mutation"></a> [permit\_policy\_mutation](#input\_permit\_policy\_mutation) | Permit `iam:UpdateAssumeRolePolicy`, `iam:CreatePolicyVersion`,<br/>and `iam:SetDefaultPolicyVersion` that this module denies by<br/>default. These actions can be used to bypass the boundary<br/>(rewriting trust policies, mutating attached policies in place,<br/>activating older policy versions). Only set to `true` for<br/>boundaries on roles that legitimately manage other roles' trust<br/>policies or policy versions (rare).<br/><br/>Note: setting this to `true` only relaxes the deny on *non-boundary*<br/>policies. Mutation of policies at the `/boundaries/` path remains<br/>denied unconditionally via a separate, always-on statement,<br/>regardless of this toggle. | `bool` | `false` | no |
 
 ### Outputs
 
