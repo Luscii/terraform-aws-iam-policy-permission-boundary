@@ -447,17 +447,17 @@ run "boundary_policy_mutation_always_denied" {
   assert {
     condition = contains(
       [for s in jsondecode(data.aws_iam_policy_document.this.json).Statement : s.Sid],
-      "denyBoundaryPolicyMutation"
+      "DenyBoundaryPolicyMutation"
     )
-    error_message = "Policy must always include denyBoundaryPolicyMutation statement"
+    error_message = "Policy must always include DenyBoundaryPolicyMutation statement"
   }
 
   assert {
     condition = anytrue([
       for s in jsondecode(data.aws_iam_policy_document.this.json).Statement :
-      s.Effect == "Deny" if s.Sid == "denyBoundaryPolicyMutation"
+      s.Effect == "Deny" if s.Sid == "DenyBoundaryPolicyMutation"
     ])
-    error_message = "denyBoundaryPolicyMutation must have Effect = Deny"
+    error_message = "DenyBoundaryPolicyMutation must have Effect = Deny"
   }
 
   assert {
@@ -467,18 +467,18 @@ run "boundary_policy_mutation_always_denied" {
       contains(s.Action, "iam:SetDefaultPolicyVersion") &&
       contains(s.Action, "iam:DeletePolicy") &&
       contains(s.Action, "iam:CreatePolicy")
-      if s.Sid == "denyBoundaryPolicyMutation"
+      if s.Sid == "DenyBoundaryPolicyMutation"
     ])
-    error_message = "denyBoundaryPolicyMutation must include the policy mutation actions"
+    error_message = "DenyBoundaryPolicyMutation must include the policy mutation actions"
   }
 
   assert {
     condition = anytrue([
       for s in jsondecode(data.aws_iam_policy_document.this.json).Statement :
       s.Resource == "arn:aws:iam::*:policy/boundaries/*"
-      if s.Sid == "denyBoundaryPolicyMutation"
+      if s.Sid == "DenyBoundaryPolicyMutation"
     ])
-    error_message = "denyBoundaryPolicyMutation must scope to arn:aws:iam::*:policy/boundaries/*"
+    error_message = "DenyBoundaryPolicyMutation must scope to arn:aws:iam::*:policy/boundaries/*"
   }
 }
 
@@ -496,9 +496,9 @@ run "boundary_policy_mutation_deny_persists_with_permit_policy_mutation" {
   assert {
     condition = contains(
       [for s in jsondecode(data.aws_iam_policy_document.this.json).Statement : s.Sid],
-      "denyBoundaryPolicyMutation"
+      "DenyBoundaryPolicyMutation"
     )
-    error_message = "denyBoundaryPolicyMutation must remain present even when permit_policy_mutation = true"
+    error_message = "DenyBoundaryPolicyMutation must remain present even when permit_policy_mutation = true"
   }
 
   assert {
@@ -506,8 +506,8 @@ run "boundary_policy_mutation_deny_persists_with_permit_policy_mutation" {
       for s in jsondecode(data.aws_iam_policy_document.this.json).Statement :
       contains(s.Action, "iam:CreatePolicyVersion") &&
       contains(s.Action, "iam:SetDefaultPolicyVersion")
-      if s.Sid == "denyBoundaryPolicyMutation"
+      if s.Sid == "DenyBoundaryPolicyMutation"
     ])
-    error_message = "denyBoundaryPolicyMutation must still cover CreatePolicyVersion / SetDefaultPolicyVersion when permit_policy_mutation = true"
+    error_message = "DenyBoundaryPolicyMutation must still cover CreatePolicyVersion / SetDefaultPolicyVersion when permit_policy_mutation = true"
   }
 }

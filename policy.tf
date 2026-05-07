@@ -85,7 +85,7 @@ data "aws_iam_policy_document" "this" {
   # at plan time; the role's identity policy already constrains which
   # accounts the action can land in.
   statement {
-    sid    = "denyBoundaryPolicyMutation"
+    sid    = "DenyBoundaryPolicyMutation"
     effect = "Deny"
     actions = [
       "iam:CreatePolicy",
