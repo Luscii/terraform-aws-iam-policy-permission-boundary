@@ -1,190 +1,98 @@
-# terraform-module-template
+# terraform-aws-iam-policy-permission-boundary
 
-Template repository for creating standardized Terraform modules following Luscii conventions.
+Creates an `aws_iam_policy` shaped as a **Permission Boundary** — a maximum-permission cap that workload roles must carry. The module produces the policy ARN; binding it onto roles is the consumer's responsibility (typically via `permissions_boundary` on `aws_iam_role` or via the `iam:PermissionsBoundary` condition on `iam:CreateRole`).
 
-## Features
+The module is opinionated: every policy it produces *always* denies a small set of actions that defeat the very purpose of a boundary (boundary tampering, by default also human-user provisioning and org-level governance). Callers add their own allow/deny lists on top.
 
-- ✅ **CloudPosse Label Integration** - Consistent resource naming and tagging
-- ✅ **TDD Workflow** - Test-driven development with Gherkin scenarios
-- ✅ **Complete Examples** - Basic and complete usage examples
-- ✅ **Comprehensive Testing** - Terraform native tests with mocking support
-- ✅ **Agent Orchestration** - Intelligent workflow with handoffs and feedback loops
-- ✅ **Documentation Standards** - terraform-docs integration
-- ✅ **Pre-commit Hooks** - Automated validation and formatting
+## When to reach for this module
 
-## Quick Start
+- You are building a Permission Boundary that bounds the *effective* permissions of a workload role, even when that role is granted broader managed policies.
+- You want the boundary's non-negotiable denies enforced *by construction*, not by review convention.
+- Your boundary content fits flat allow/deny action lists (this module does not currently expose `NotAction`, `NotResource`, or conditions — see "When not to reach for this module").
 
-### Use as Template
+## When not to reach for this module
 
-1. Click "Use this template" on GitHub
-2. Create new repository with pattern: `terraform-{provider}-{name}`
-3. Clone and customize for your module
+- You need IAM conditions in the boundary (e.g., `aws:RequestedRegion` pinning, recursive `iam:PermissionsBoundary` requirement on role creation). Author the policy directly.
+- You need `NotAction` / `NotResource` patterns. Author the policy directly.
+- You need per-statement resource scoping. The module hardcodes `Resource: ["*"]`, which is appropriate for boundaries (a boundary caps *what the role can attempt*, not *which resources*) but limits expressiveness.
 
-### Using This Module
+## Built-in denies
 
-```terraform
+These are always present in the rendered policy. They cannot be removed by caller-supplied `denied_actions` (which only adds; it does not subtract).
+
+| Group | Actions | Toggle |
+|---|---|---|
+| **Boundary tampering** | `iam:DeleteRolePermissionsBoundary`, `iam:DeleteUserPermissionsBoundary`, `iam:PutRolePermissionsBoundary`, `iam:PutUserPermissionsBoundary` | Always on (no opt-out) |
+| **Human user surface** | `iam:CreateUser`, `iam:CreateLoginProfile`, `iam:UpdateLoginProfile`, `iam:CreateAccessKey`, `iam:UpdateAccessKey` | Off by default. Set `permit_human_user_actions = true` to permit. |
+| **Org governance** | `organizations:*`, `account:*` | Off by default. Set `permit_org_governance = true` to permit. |
+
+Notably absent from the built-in denies: `iam:CreateRole`. The boundary does *not* deny role creation — that is governed by an upstream condition (`iam:PermissionsBoundary` on `iam:CreateRole`) in the consumer's policy, ensuring any newly created role carries this same boundary.
+
+## Validations
+
+The module fails fast at plan time on inputs that would defeat the boundary:
+
+- `allowed_actions` must not contain `*`, `iam:*`, `sts:*`, `organizations:*`, or `account:*`. Use qualified actions (`iam:Get*`, `s3:GetObject`).
+
+## Usage
+
+```hcl
 module "label" {
   source  = "cloudposse/label/null"
   version = "0.25.0"
 
-  namespace   = "luscii"
-  environment = "production"
-  name        = "example"
+  namespace = "luscii"
+  name      = "workload"
 }
 
-module "example" {
-  source = "github.com/Luscii/terraform-module-template"
+module "boundary" {
+  source = "github.com/Luscii/terraform-aws-iam-policy-permission-boundary?ref=v0.1.0"
 
-  name = module.label.name
-
+  name    = module.label.name
   context = module.label.context
+
+  allowed_actions = [
+    "s3:*",
+    "dynamodb:*",
+    "sqs:*",
+    "kms:Decrypt",
+    "kms:Encrypt",
+    "kms:GenerateDataKey",
+    "secretsmanager:GetSecretValue",
+  ]
+
+  denied_actions = [
+    "ec2:RunInstances",
+  ]
 }
 ```
+
+The boundary is then bound onto a workload role via `permissions_boundary = module.boundary.policy_arn`.
 
 ## Examples
 
-### Minimal Setup
+- [`examples/basic`](./examples/basic) — minimal allow/deny lists with default built-in denies.
+- [`examples/complete`](./examples/complete) — workload-shaped boundary with realistic action lists, tags, and one of the opt-out toggles demonstrated.
 
-```terraform
-module "basic" {
-  source = "github.com/Luscii/terraform-module-template"
+## Tests
 
-  name = "my-resource"
-
-  context = module.label.context
-}
-```
-
-### Advanced Setup
-
-For complete examples with all features, see [examples/](./examples/).
-
-## Development Workflow
-
-### Test-Driven Development
-
-1. **Create Feature Scenarios** (`docs/features/`)
-   ```bash
-   # AI agent: scenario-shaper
-   ```
-
-2. **Generate Tests** (`tests/*.tftest.hcl`)
-   ```bash
-   # AI agent: terraform-tester
-   ```
-
-3. **Implement Module** (`main.tf`, `*.tf`)
-   ```bash
-   # AI agent: terraform-module-specialist
-   terraform test  # Validate implementation
-   ```
-
-4. **Create Documentation** (`README.md`, descriptions)
-   ```bash
-   # AI agent: documentation-specialist
-   terraform-docs markdown . --output-file README.md
-   ```
-
-5. **Build Examples** (`examples/`)
-   ```bash
-   # AI agent: examples-specialist
-   ```
-
-### Pre-commit Hooks
+Unit tests live in [`tests/permission-boundary.tftest.hcl`](./tests/permission-boundary.tftest.hcl). They use a real AWS provider with `skip_credentials_validation` / `skip_requesting_account_id` / `skip_metadata_api_check` set, because `mock_provider "aws" {}` substitutes locally-computed `aws_iam_policy_document.json` with random strings and breaks JSON-shape assertions.
 
 ```bash
-# Install pre-commit
+terraform init
+terraform test
+```
+
+## Pre-commit
+
+```bash
 brew install pre-commit
-
-# Install hooks
 pre-commit install
-
-# Run manually
 pre-commit run --all-files
 ```
-
-## Directory Structure
-
-```
-terraform-{provider}-{name}/
-├── .github/
-│   ├── agents/              # AI agent specifications
-│   ├── instructions/        # Development standards
-│   └── workflows/           # CI/CD pipelines
-├── docs/
-│   ├── adr/                 # Architecture Decision Records
-│   └── features/            # Gherkin feature files
-├── examples/
-│   ├── basic/               # Minimal example
-│   └── complete/            # Full-featured example
-├── tests/                   # Terraform tests
-├── main.tf                  # Primary resources
-├── variables.tf             # Input variables
-├── outputs.tf               # Output values
-├── versions.tf              # Version constraints
-├── README.md                # This file
-└── LICENSE                  # License information
-```
-
-## Standards and Instructions
-
-All development follows standards in `.github/instructions/`:
-
-- **terraform.instructions.md** - Terraform code standards
-- **documentation.instructions.md** - Documentation guidelines
-- **examples.instructions.md** - Example creation
-- **terraform-tests.instructions.md** - Testing guide
-- **file-structure.instructions.md** - Module organization
-- **adr.instructions.md** - ADR documentation
-
-## Agent Workflow
-
-### Happy Path (Automatic)
-```
-implementation-plan → scenario-shaper → terraform-tester →
-terraform-module-specialist → documentation-specialist → examples-specialist
-```
-
-### Feedback Loops (Manual/Conditional)
-- Module ↔ Tester (test adjustments)
-- Module → Scenario (scenario issues)
-- Module → Plan (critical architecture issues)
-- Docs → Module (documentation gaps)
-- Examples → Module (module issues)
 
 ## Configuration
 
 <!-- BEGIN_TF_DOCS -->
-### Requirements
-
-| Name | Version |
-|------|---------|
-| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.3 |
-
-### Providers
-
-No providers.
-
-### Modules
-
-| Name | Source | Version |
-|------|--------|---------|
-| <a name="module_label"></a> [label](#module\_label) | cloudposse/label/null | 0.25.0 |
-
-### Resources
-
-No resources.
-
-### Inputs
-
-| Name | Description | Type | Default | Required |
-|------|-------------|------|---------|:--------:|
-| <a name="input_context"></a> [context](#input\_context) | Single object for setting entire context at once.<br/>See description of individual variables for details.<br/>Leave string and numeric variables as `null` to use default value.<br/>Individual variable settings (non-null) override settings in context object,<br/>except for attributes, tags, and additional\_tag\_map, which are merged. | `any` | <pre>{<br/>  "additional_tag_map": {},<br/>  "attributes": [],<br/>  "delimiter": null,<br/>  "descriptor_formats": {},<br/>  "enabled": true,<br/>  "environment": null,<br/>  "id_length_limit": null,<br/>  "label_key_case": null,<br/>  "label_order": [],<br/>  "label_value_case": null,<br/>  "labels_as_tags": [<br/>    "unset"<br/>  ],<br/>  "name": null,<br/>  "namespace": null,<br/>  "regex_replace_chars": null,<br/>  "stage": null,<br/>  "tags": {},<br/>  "tenant": null<br/>}</pre> | no |
-| <a name="input_name"></a> [name](#input\_name) | Name of the resource to be labeled. This is used to generate the label key and value. | `string` | n/a | yes |
-
-### Outputs
-
-| Name | Description |
-|------|-------------|
-| <a name="output_label_context"></a> [label\_context](#output\_label\_context) | Context of the label for subsequent use |
+<!-- terraform-docs will populate this section -->
 <!-- END_TF_DOCS -->

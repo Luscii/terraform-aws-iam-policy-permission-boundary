@@ -12,3 +12,8 @@ output "label_tags" {
   value       = module.example.label_context.tags
   description = "Generated tags"
 }
+
+output "policy_arn" {
+  value       = module.example.policy_arn
+  description = "ARN of the Permission Boundary policy"
+}
