@@ -300,6 +300,19 @@ run "rejects_organizations_wildcard_in_allowed" {
   expect_failures = [var.allowed_actions]
 }
 
+run "rejects_bare_wildcard_with_trailing_whitespace" {
+  command = plan
+
+  variables {
+    # Without trimspace() in the validation, this would slip through
+    # (lower("iam:* ") != "iam:*") despite being effectively iam:*.
+    allowed_actions = ["iam:* "]
+    denied_actions  = []
+  }
+
+  expect_failures = [var.allowed_actions]
+}
+
 run "allow_all_emits_unrestricted_allow" {
   command = plan
 

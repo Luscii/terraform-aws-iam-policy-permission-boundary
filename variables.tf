@@ -71,9 +71,12 @@ variable "allowed_actions" {
   EOT
 
   validation {
+    # trimspace() before lower() so leading/trailing whitespace can't
+    # bypass the denylist (e.g., "iam:* " would otherwise pass the
+    # check yet still be effectively iam:* at apply time).
     condition = alltrue([
       for action in var.allowed_actions :
-      !contains(["*", "iam:*", "sts:*", "organizations:*", "account:*"], lower(action))
+      !contains(["*", "iam:*", "sts:*", "organizations:*", "account:*"], lower(trimspace(action)))
     ])
     error_message = "allowed_actions must not contain bare wildcards for iam, sts, organizations, account, or '*' — these defeat the boundary. Use qualified actions like 'iam:Get*' instead."
   }
