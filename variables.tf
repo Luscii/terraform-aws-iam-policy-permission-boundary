@@ -45,9 +45,16 @@ variable "context" {
   }
 }
 
-variable "name" {
-  type        = string
-  description = "Name of the resource to be labeled. This is used to generate the label key and value."
+variable "allow_all" {
+  type        = bool
+  default     = false
+  description = <<-EOT
+    Emit an unrestricted `Allow *` on `*`. This is the standard shape
+    for a Permission Boundary configured as a deny-list — the boundary
+    caps via its built-in + caller-supplied denies; identity-based
+    policies still grant the actual permissions. Mutually exclusive
+    with `allowed_actions`: use one or the other.
+  EOT
 }
 
 variable "allowed_actions" {
@@ -82,30 +89,9 @@ variable "denied_actions" {
   EOT
 }
 
-variable "allow_all" {
-  type        = bool
-  default     = false
-  description = <<-EOT
-    Emit an unrestricted `Allow *` on `*`. This is the standard shape
-    for a Permission Boundary configured as a deny-list — the boundary
-    caps via its built-in + caller-supplied denies; identity-based
-    policies still grant the actual permissions. Mutually exclusive
-    with `allowed_actions`: use one or the other.
-  EOT
-}
-
-variable "permit_policy_mutation" {
-  type        = bool
-  default     = false
-  description = <<-EOT
-    Permit `iam:UpdateAssumeRolePolicy`, `iam:CreatePolicyVersion`,
-    and `iam:SetDefaultPolicyVersion` that this module denies by
-    default. These actions can be used to bypass the boundary
-    (rewriting trust policies, mutating attached policies in place,
-    activating older policy versions). Only set to `true` for
-    boundaries on roles that legitimately manage other roles' trust
-    policies or policy versions (rare).
-  EOT
+variable "name" {
+  type        = string
+  description = "Name of the resource to be labeled. This is used to generate the label key and value."
 }
 
 variable "permit_human_user_actions" {
@@ -127,5 +113,19 @@ variable "permit_org_governance" {
     Permit `organizations:*` and `account:*` that this module denies
     by default. Only set to `true` for boundaries on org-management
     roles (rare).
+  EOT
+}
+
+variable "permit_policy_mutation" {
+  type        = bool
+  default     = false
+  description = <<-EOT
+    Permit `iam:UpdateAssumeRolePolicy`, `iam:CreatePolicyVersion`,
+    and `iam:SetDefaultPolicyVersion` that this module denies by
+    default. These actions can be used to bypass the boundary
+    (rewriting trust policies, mutating attached policies in place,
+    activating older policy versions). Only set to `true` for
+    boundaries on roles that legitimately manage other roles' trust
+    policies or policy versions (rare).
   EOT
 }
