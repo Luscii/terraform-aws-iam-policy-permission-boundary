@@ -299,3 +299,126 @@ run "rejects_organizations_wildcard_in_allowed" {
 
   expect_failures = [var.allowed_actions]
 }
+
+run "allow_all_emits_unrestricted_allow" {
+  command = plan
+
+  variables {
+    allow_all       = true
+    allowed_actions = []
+    denied_actions  = ["ec2:RunInstances"]
+  }
+
+  assert {
+    condition = contains(
+      [for s in jsondecode(data.aws_iam_policy_document.this.json).Statement : s.Sid],
+      "AllowAll"
+    )
+    error_message = "allow_all = true must produce an AllowAll statement"
+  }
+
+  assert {
+    condition = anytrue([
+      for s in jsondecode(data.aws_iam_policy_document.this.json).Statement :
+      s.Effect == "Allow" && s.Action == "*" && s.Resource == "*" if s.Sid == "AllowAll"
+    ])
+    error_message = "AllowAll statement must be Effect=Allow, Action=*, Resource=*"
+  }
+
+  assert {
+    condition = !contains(
+      [for s in jsondecode(data.aws_iam_policy_document.this.json).Statement : s.Sid],
+      "AllowedActions"
+    )
+    error_message = "allow_all = true with empty allowed_actions must not produce an AllowedActions statement"
+  }
+
+  # Built-in denies still present in deny-list shape
+  assert {
+    condition = contains(
+      [for s in jsondecode(data.aws_iam_policy_document.this.json).Statement : s.Sid],
+      "BuiltInDenies"
+    )
+    error_message = "BuiltInDenies must be present even when allow_all = true"
+  }
+}
+
+run "allow_all_with_allowed_actions_rejected_by_precondition" {
+  command = plan
+
+  variables {
+    allow_all       = true
+    allowed_actions = ["s3:GetObject"]
+    denied_actions  = []
+  }
+
+  expect_failures = [aws_iam_policy.this]
+}
+
+run "policy_mutation_denied_by_default" {
+  command = plan
+
+  variables {
+    allowed_actions = ["s3:GetObject"]
+    denied_actions  = []
+  }
+
+  assert {
+    condition = anytrue([
+      for s in jsondecode(data.aws_iam_policy_document.this.json).Statement :
+      contains(s.Action, "iam:UpdateAssumeRolePolicy") if s.Sid == "BuiltInDenies"
+    ])
+    error_message = "BuiltInDenies must include iam:UpdateAssumeRolePolicy by default"
+  }
+
+  assert {
+    condition = anytrue([
+      for s in jsondecode(data.aws_iam_policy_document.this.json).Statement :
+      contains(s.Action, "iam:CreatePolicyVersion") if s.Sid == "BuiltInDenies"
+    ])
+    error_message = "BuiltInDenies must include iam:CreatePolicyVersion by default"
+  }
+
+  assert {
+    condition = anytrue([
+      for s in jsondecode(data.aws_iam_policy_document.this.json).Statement :
+      contains(s.Action, "iam:SetDefaultPolicyVersion") if s.Sid == "BuiltInDenies"
+    ])
+    error_message = "BuiltInDenies must include iam:SetDefaultPolicyVersion by default"
+  }
+}
+
+run "permit_policy_mutation_removes_those_denies" {
+  command = plan
+
+  variables {
+    allowed_actions        = ["s3:GetObject"]
+    denied_actions         = []
+    permit_policy_mutation = true
+  }
+
+  assert {
+    condition = !anytrue([
+      for s in jsondecode(data.aws_iam_policy_document.this.json).Statement :
+      contains(s.Action, "iam:UpdateAssumeRolePolicy") if s.Sid == "BuiltInDenies"
+    ])
+    error_message = "permit_policy_mutation = true must remove iam:UpdateAssumeRolePolicy from BuiltInDenies"
+  }
+
+  assert {
+    condition = !anytrue([
+      for s in jsondecode(data.aws_iam_policy_document.this.json).Statement :
+      contains(s.Action, "iam:CreatePolicyVersion") if s.Sid == "BuiltInDenies"
+    ])
+    error_message = "permit_policy_mutation = true must remove iam:CreatePolicyVersion from BuiltInDenies"
+  }
+
+  # Boundary tampering remains denied
+  assert {
+    condition = anytrue([
+      for s in jsondecode(data.aws_iam_policy_document.this.json).Statement :
+      contains(s.Action, "iam:DeleteRolePermissionsBoundary") if s.Sid == "BuiltInDenies"
+    ])
+    error_message = "Boundary tampering must remain denied even when permit_policy_mutation = true"
+  }
+}

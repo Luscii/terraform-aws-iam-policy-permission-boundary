@@ -53,10 +53,12 @@ variable "name" {
 variable "allowed_actions" {
   type        = list(string)
   description = <<-EOT
-    List of allowed actions for the Permission Boundary policy.
+    Allow-list for the Permission Boundary policy.
     Use qualified actions (e.g., `iam:Get*`, `s3:GetObject`).
-    Bare service wildcards that would defeat the boundary
-    (`iam:*`, `sts:*`, `organizations:*`, `account:*`, `*`) are rejected.
+    Bare service wildcards that would defeat an allow-list boundary
+    (`iam:*`, `sts:*`, `organizations:*`, `account:*`, `*`) are rejected
+    here — for the deny-list PB shape (allow everything, cap via denies),
+    use `allow_all = true` instead.
     May be empty if the boundary is deny-only.
   EOT
 
@@ -75,6 +77,32 @@ variable "denied_actions" {
     Caller-supplied additional denies, applied on top of the
     module's built-in denies. Overlap with built-ins is harmless
     (idempotent). May be empty.
+  EOT
+}
+
+variable "allow_all" {
+  type        = bool
+  default     = false
+  description = <<-EOT
+    Emit an unrestricted `Allow *` on `*`. This is the standard shape
+    for a Permission Boundary configured as a deny-list — the boundary
+    caps via its built-in + caller-supplied denies; identity-based
+    policies still grant the actual permissions. Mutually exclusive
+    with `allowed_actions`: use one or the other.
+  EOT
+}
+
+variable "permit_policy_mutation" {
+  type        = bool
+  default     = false
+  description = <<-EOT
+    Permit `iam:UpdateAssumeRolePolicy`, `iam:CreatePolicyVersion`,
+    and `iam:SetDefaultPolicyVersion` that this module denies by
+    default. These actions can be used to bypass the boundary
+    (rewriting trust policies, mutating attached policies in place,
+    activating older policy versions). Only set to `true` for
+    boundaries on roles that legitimately manage other roles' trust
+    policies or policy versions (rare).
   EOT
 }
 
