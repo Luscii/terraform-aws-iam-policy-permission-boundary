@@ -1,4 +1,6 @@
 locals {
+  boundary_path = "/boundaries/"
+
   builtin_denies_boundary_tampering = [
     "iam:DeleteRolePermissionsBoundary",
     "iam:DeleteUserPermissionsBoundary",
@@ -73,11 +75,34 @@ data "aws_iam_policy_document" "this" {
     actions   = local.builtin_denies
     resources = ["*"]
   }
+
+  # Boundary policies live at /boundaries/ (see local.boundary_path,
+  # also the path used by aws_iam_policy.this below). This statement
+  # absolutely denies any mutation of those policies — independent of
+  # the permit_policy_mutation toggle, which only relaxes the general
+  # policy-version mutation deny in BuiltInDenies for *non-boundary*
+  # policies. Account is wildcarded so the module needs no STS lookup
+  # at plan time; the role's identity policy already constrains which
+  # accounts the action can land in.
+  statement {
+    sid    = "denyBoundaryPolicyMutation"
+    effect = "Deny"
+    actions = [
+      "iam:CreatePolicy",
+      "iam:DeletePolicy",
+      "iam:CreatePolicyVersion",
+      "iam:DeletePolicyVersion",
+      "iam:SetDefaultPolicyVersion",
+      "iam:TagPolicy",
+      "iam:UntagPolicy",
+    ]
+    resources = ["arn:aws:iam::*:policy${local.boundary_path}*"]
+  }
 }
 
 resource "aws_iam_policy" "this" {
   name        = module.label.id
-  path        = "/boundaries/"
+  path        = local.boundary_path
   description = "Permission boundary policy: ${module.label.name}"
   policy      = data.aws_iam_policy_document.this.json
 

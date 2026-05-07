@@ -422,3 +422,79 @@ run "permit_policy_mutation_removes_those_denies" {
     error_message = "Boundary tampering must remain denied even when permit_policy_mutation = true"
   }
 }
+
+run "boundary_policy_mutation_always_denied" {
+  command = plan
+
+  variables {
+    allowed_actions = ["s3:GetObject"]
+    denied_actions  = []
+  }
+
+  assert {
+    condition = contains(
+      [for s in jsondecode(data.aws_iam_policy_document.this.json).Statement : s.Sid],
+      "denyBoundaryPolicyMutation"
+    )
+    error_message = "Policy must always include denyBoundaryPolicyMutation statement"
+  }
+
+  assert {
+    condition = anytrue([
+      for s in jsondecode(data.aws_iam_policy_document.this.json).Statement :
+      s.Effect == "Deny" if s.Sid == "denyBoundaryPolicyMutation"
+    ])
+    error_message = "denyBoundaryPolicyMutation must have Effect = Deny"
+  }
+
+  assert {
+    condition = anytrue([
+      for s in jsondecode(data.aws_iam_policy_document.this.json).Statement :
+      contains(s.Action, "iam:CreatePolicyVersion") &&
+      contains(s.Action, "iam:SetDefaultPolicyVersion") &&
+      contains(s.Action, "iam:DeletePolicy") &&
+      contains(s.Action, "iam:CreatePolicy")
+      if s.Sid == "denyBoundaryPolicyMutation"
+    ])
+    error_message = "denyBoundaryPolicyMutation must include the policy mutation actions"
+  }
+
+  assert {
+    condition = anytrue([
+      for s in jsondecode(data.aws_iam_policy_document.this.json).Statement :
+      s.Resource == "arn:aws:iam::*:policy/boundaries/*"
+      if s.Sid == "denyBoundaryPolicyMutation"
+    ])
+    error_message = "denyBoundaryPolicyMutation must scope to arn:aws:iam::*:policy/boundaries/*"
+  }
+}
+
+run "boundary_policy_mutation_deny_persists_with_permit_policy_mutation" {
+  command = plan
+
+  variables {
+    allowed_actions        = ["s3:GetObject"]
+    denied_actions         = []
+    permit_policy_mutation = true
+  }
+
+  # The general policy-mutation deny is relaxed by the toggle, but
+  # mutation of *boundary* policies must remain denied absolutely.
+  assert {
+    condition = contains(
+      [for s in jsondecode(data.aws_iam_policy_document.this.json).Statement : s.Sid],
+      "denyBoundaryPolicyMutation"
+    )
+    error_message = "denyBoundaryPolicyMutation must remain present even when permit_policy_mutation = true"
+  }
+
+  assert {
+    condition = anytrue([
+      for s in jsondecode(data.aws_iam_policy_document.this.json).Statement :
+      contains(s.Action, "iam:CreatePolicyVersion") &&
+      contains(s.Action, "iam:SetDefaultPolicyVersion")
+      if s.Sid == "denyBoundaryPolicyMutation"
+    ])
+    error_message = "denyBoundaryPolicyMutation must still cover CreatePolicyVersion / SetDefaultPolicyVersion when permit_policy_mutation = true"
+  }
+}
