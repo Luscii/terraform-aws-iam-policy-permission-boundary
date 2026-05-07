@@ -52,6 +52,7 @@ variable "name" {
 
 variable "allowed_actions" {
   type        = list(string)
+  default     = []
   description = <<-EOT
     Allow-list for the Permission Boundary policy.
     Use qualified actions (e.g., `iam:Get*`, `s3:GetObject`).
@@ -59,7 +60,7 @@ variable "allowed_actions" {
     (`iam:*`, `sts:*`, `organizations:*`, `account:*`, `*`) are rejected
     here — for the deny-list PB shape (allow everything, cap via denies),
     use `allow_all = true` instead.
-    May be empty if the boundary is deny-only.
+    May be empty (default) if the boundary is deny-only or uses `allow_all`.
   EOT
 
   validation {
@@ -73,10 +74,11 @@ variable "allowed_actions" {
 
 variable "denied_actions" {
   type        = list(string)
+  default     = []
   description = <<-EOT
     Caller-supplied additional denies, applied on top of the
     module's built-in denies. Overlap with built-ins is harmless
-    (idempotent). May be empty.
+    (idempotent). May be empty (default).
   EOT
 }
 
