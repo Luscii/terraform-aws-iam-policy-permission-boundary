@@ -313,6 +313,19 @@ run "rejects_bare_wildcard_with_trailing_whitespace" {
   expect_failures = [var.allowed_actions]
 }
 
+run "rejects_repeated_iam_wildcard_in_allowed" {
+  command = plan
+
+  variables {
+    # IAM treats "iam:**" the same as "iam:*", so an exact-string
+    # check would let it through.
+    allowed_actions = ["iam:**"]
+    denied_actions  = []
+  }
+
+  expect_failures = [var.allowed_actions]
+}
+
 run "allow_all_emits_unrestricted_allow" {
   command = plan
 
