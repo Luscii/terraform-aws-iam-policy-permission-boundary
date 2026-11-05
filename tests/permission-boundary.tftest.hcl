@@ -326,6 +326,56 @@ run "rejects_repeated_iam_wildcard_in_allowed" {
   expect_failures = [var.allowed_actions]
 }
 
+# "?" with "*" matches every action of a service just like "*" alone.
+run "rejects_question_mark_then_asterisk_in_allowed" {
+  command = plan
+
+  variables {
+    allowed_actions = ["iam:?*"]
+    denied_actions  = []
+  }
+
+  expect_failures = [var.allowed_actions]
+}
+
+run "rejects_asterisk_then_question_mark_in_allowed" {
+  command = plan
+
+  variables {
+    allowed_actions = ["sts:*?"]
+    denied_actions  = []
+  }
+
+  expect_failures = [var.allowed_actions]
+}
+
+run "rejects_bare_question_mark_wildcard_in_allowed" {
+  command = plan
+
+  variables {
+    allowed_actions = ["?*"]
+    denied_actions  = []
+  }
+
+  expect_failures = [var.allowed_actions]
+}
+
+# A qualified pattern of the same characters is still accepted: the check
+# rejects only patterns that are nothing but wildcards.
+run "accepts_qualified_wildcards_in_allowed" {
+  command = plan
+
+  variables {
+    allowed_actions = ["iam:Get*", "sts:Get?allerIdentity", "s3:*"]
+    denied_actions  = []
+  }
+
+  assert {
+    condition     = length(var.allowed_actions) == 3
+    error_message = "Qualified patterns, and whole-service wildcards for services outside the guarded four, pass."
+  }
+}
+
 run "allow_all_emits_unrestricted_allow" {
   command = plan
 
